@@ -71,6 +71,7 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TRENDING_CARD_WIDTH = 140;
 const RECOMMENDATION_CARD_WIDTH = 150;
 const HORIZONTAL_CARD_GAP = 12;
+const LIST_SIDE_PADDING = 16;
 const TRENDING_SNAP_INTERVAL = TRENDING_CARD_WIDTH + HORIZONTAL_CARD_GAP;
 const RECOMMENDATION_SNAP_INTERVAL = RECOMMENDATION_CARD_WIDTH + HORIZONTAL_CARD_GAP;
 
@@ -425,6 +426,14 @@ const HomeScreen = () => {
   const resolvedMoodDetails = useMemo(
     () => (resolvedMood ? MOOD_PRESETS.find((preset) => preset.id === resolvedMood) ?? null : null),
     [resolvedMood]
+  );
+  const recommendationSnapOffsets = useMemo(
+    () => recommendedMovies.map((_, index) => LIST_SIDE_PADDING + index * RECOMMENDATION_SNAP_INTERVAL),
+    [recommendedMovies]
+  );
+  const trendingSnapOffsets = useMemo(
+    () => movies.map((_, index) => LIST_SIDE_PADDING + index * TRENDING_SNAP_INTERVAL),
+    [movies]
   );
 
   const loadMoodRecommendations = useCallback(
@@ -827,7 +836,7 @@ const HomeScreen = () => {
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
               snapToAlignment="start"
-              snapToInterval={RECOMMENDATION_SNAP_INTERVAL}
+              snapToOffsets={recommendationSnapOffsets}
               disableIntervalMomentum
               contentContainerStyle={styles.recommendationsList}
             >
@@ -869,7 +878,7 @@ const HomeScreen = () => {
               showsHorizontalScrollIndicator={false}
               decelerationRate="fast"
               snapToAlignment="start"
-              snapToInterval={TRENDING_SNAP_INTERVAL}
+              snapToOffsets={trendingSnapOffsets}
               disableIntervalMomentum
               removeClippedSubviews={false}
               contentContainerStyle={styles.listContent}
@@ -880,7 +889,7 @@ const HomeScreen = () => {
               windowSize={5}
               getItemLayout={(_, index) => ({
                 length: TRENDING_CARD_WIDTH + HORIZONTAL_CARD_GAP,
-                offset: (TRENDING_CARD_WIDTH + HORIZONTAL_CARD_GAP) * index,
+                offset: LIST_SIDE_PADDING + (TRENDING_CARD_WIDTH + HORIZONTAL_CARD_GAP) * index,
                 index,
               })}
               ListEmptyComponent={
@@ -953,7 +962,7 @@ const styles = StyleSheet.create({
   },
   themeToggleText: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
   center: { alignItems: 'center', justifyContent: 'center', minHeight: 140 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 16 },
+  listContent: { paddingHorizontal: LIST_SIDE_PADDING, paddingBottom: 16 },
   card: { width: TRENDING_CARD_WIDTH, marginRight: HORIZONTAL_CARD_GAP },
   posterWrapper: {
     width: TRENDING_CARD_WIDTH,
@@ -1028,7 +1037,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', columnGap: 12 },
   linkButton: { fontSize: 13, fontWeight: '600' },
   recommendationsWrapper: { minHeight: 240, paddingBottom: 24, paddingHorizontal: 16 },
-  recommendationsList: { paddingHorizontal: 16 },
+  recommendationsList: { paddingHorizontal: LIST_SIDE_PADDING },
   recoCard: {
     width: RECOMMENDATION_CARD_WIDTH,
     marginRight: HORIZONTAL_CARD_GAP,

@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const validateRequest = require('../middleware/validateRequest');
 const router = express.Router();
 
+router.get('/me', auth, watchlistController.getMyWatchlist);
 router.get('/:userId', auth, watchlistController.getWatchlistByUser);
 router.post(
   '/',

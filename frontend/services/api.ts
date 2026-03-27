@@ -183,8 +183,20 @@ export type MoodRecommendationResponse =
   | undefined;
 
 export const fetchMoodRecommendations = async (payload: MoodRecommendationRequest) => {
-  const response = await api.post('/recommendations/mood', payload);
-  return response.data as MoodRecommendationResponse;
+  try {
+    const response = await api.post('/recommendations/mood', payload, { timeout: 25000 });
+    return response.data as MoodRecommendationResponse;
+  } catch (error) {
+    const message = String((error as { message?: string })?.message || '');
+    const hasResponse = Boolean((error as { response?: unknown })?.response);
+    const shouldRetry = !hasResponse && (message.includes('Network Error') || message.includes('timeout'));
+    if (!shouldRetry) {
+      throw error;
+    }
+
+    const retryResponse = await api.post('/recommendations/mood', payload, { timeout: 35000 });
+    return retryResponse.data as MoodRecommendationResponse;
+  }
 };
 
 type SearchMoviesOptions = {
@@ -366,7 +378,7 @@ export type WatchlistMoviePayload = {
 };
 
 export const fetchWatchlist = async (userId: number) => {
-  const response = await api.get(`/watchlists/${userId}`);
+  const response = await api.get('/watchlists/me');
   return response.data as WatchlistEntry[];
 };
 

@@ -32,6 +32,22 @@ const buildMoviePayload = (movieId, movieData = {}) => {
   };
 };
 
+const loadWatchlistByUserId = async (userId) => {
+  return Watchlist.findAll({
+    where: { userId },
+    include: [Movie],
+  });
+};
+
+exports.getMyWatchlist = async (req, res) => {
+  try {
+    const watchlist = await loadWatchlistByUserId(req.user.id);
+    res.json(watchlist);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.getWatchlistByUser = async (req, res) => {
   try {
     const requestedUserId = Number(req.params.userId);
@@ -42,10 +58,7 @@ exports.getWatchlistByUser = async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const watchlist = await Watchlist.findAll({
-      where: { userId: requestedUserId },
-      include: [Movie]
-    });
+    const watchlist = await loadWatchlistByUserId(requestedUserId);
     res.json(watchlist);
   } catch (err) {
     res.status(500).json({ error: err.message });

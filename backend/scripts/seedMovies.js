@@ -76,13 +76,6 @@ const MOVIE_SEED = [
     genres: ['Thriller', 'Action'],
   },
   {
-    title: 'Velvet Arcade',
-    description: 'A synth-pop infused coming-of-age story set inside a retro arcade slated for demolition.',
-    releaseDate: '2017-10-06',
-    poster: 'https://image.tmdb.org/t/p/w500/velvet-arcade.jpg',
-    genres: ['Drama', 'Music'],
-  },
-  {
     title: 'Lantern Festival',
     description: 'Three siblings reunite for their hometown lantern festival and uncover the legend behind their family shop.',
     releaseDate: '2022-01-28',
@@ -166,12 +159,6 @@ const REVIEW_SEED = [
     title: 'Hurricane Alley',
     reviews: [
       { userId: 3, rating: 4.3, comment: 'Tense disaster thrills.' },
-    ],
-  },
-  {
-    title: 'Velvet Arcade',
-    reviews: [
-      { userId: 1, rating: 4.1, comment: 'Retro vibes and synth bliss.' },
     ],
   },
   {

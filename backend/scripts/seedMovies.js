@@ -5,21 +5,16 @@
  */
 
 const path = require('path');
-
-require('dotenv').config({
-  path: path.resolve(__dirname, '../.env'),
-});
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const sequelize = require('../src/config/database');
 require('../src/models');
-
 const { Movie, Review, User } = require('../src/models');
 
 const MOVIE_SEED = [
   {
     title: 'Sunshine Avenue',
-    description:
-      'A vibrant comedy about neighbors who start a community music night.',
+    description: 'A vibrant comedy about neighbors who start a community music night.',
     releaseDate: '2021-06-18',
     poster: 'https://image.tmdb.org/t/p/w500/sunshine-avenue.jpg',
     genres: ['Comedy', 'Family', 'Music'],
@@ -86,25 +81,28 @@ const REVIEW_SEED = [
   { title: 'Emberfall', reviews: [{ userId: 1, rating: 4.0 }, { userId: 2, rating: 4.2 }] },
 ];
 
-async function seedMovies() {
+async function seedMovies({ dryRun = false } = {}) {
   console.log('🌱 Starting database seed...');
 
   await sequelize.authenticate();
   await sequelize.sync({ alter: true });
 
   const transaction = await sequelize.transaction();
-
   try {
     const userCount = await User.count();
+    if (!userCount) throw new Error('Create users before running seed.');
 
-    if (!userCount) {
-      throw new Error('Create users before running seed.');
-    }
-
-    await Movie.bulkCreate(MOVIE_SEED, {
-      updateOnDuplicate: ['description', 'releaseDate', 'poster', 'genres'],
-      transaction,
-    });
+    await Promise.all(
+      MOVIE_SEED.map((movie) =>
+        Movie.upsert(
+          {
+            ...movie,
+            genres: JSON.stringify(movie.genres),
+          },
+          { transaction }
+        )
+      )
+    );
 
     console.log('🎬 Movies seeded');
 
@@ -116,35 +114,30 @@ async function seedMovies() {
 
       if (!movie) continue;
 
-      for (const review of bucket.reviews) {
-        await Review.upsert(
-          {
-            userId: review.userId,
-            movieId: movie.id,
-            rating: review.rating,
-          },
-          { transaction }
-        );
-      }
+      await Promise.all(
+        bucket.reviews.map((review) =>
+          Review.upsert(
+            { userId: review.userId, movieId: movie.id, rating: review.rating },
+            { transaction }
+          )
+        )
+      );
     }
 
     console.log('⭐ Reviews seeded');
 
-    await transaction.commit();
+    if (!dryRun) await transaction.commit();
+    else await transaction.rollback();
 
     const movies = await Movie.count();
     const reviews = await Review.count();
-
     console.log(`✅ Seed finished | Movies: ${movies} | Reviews: ${reviews}`);
   } catch (error) {
     await transaction.rollback();
-    throw error;
+    console.error('❌ Seeding failed:', error.message);
+  } finally {
+    await sequelize.close();
   }
 }
 
-seedMovies()
-  .then(() => sequelize.close())
-  .catch((err) => {
-    console.error('❌ Seeding failed:', err.message);
-    sequelize.close().finally(() => process.exit(1));
-  });
+seedMovies();

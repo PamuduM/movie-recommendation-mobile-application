@@ -4,7 +4,10 @@
  * and review ratings for the AI mood recommender.
  */
 
+#!/usr/bin/env node
+
 const path = require('path');
+
 require('dotenv').config({
   path: path.resolve(__dirname, '../.env'),
 });
@@ -13,10 +16,6 @@ const sequelize = require('../src/config/database');
 require('../src/models');
 
 const { Movie, Review, User } = require('../src/models');
-
-/* -------------------------------------------------------------------------- */
-/*                                MOVIE DATA                                  */
-/* -------------------------------------------------------------------------- */
 
 const MOVIE_SEED = [
   {
@@ -43,7 +42,7 @@ const MOVIE_SEED = [
   },
   {
     title: 'Moonlit Harbor',
-    description: 'A slow and calming story about healing and hope.',
+    description: 'A calm story about healing and hope by the sea.',
     releaseDate: '2019-04-21',
     poster: 'https://image.tmdb.org/t/p/w500/moonlit-harbor.jpg',
     genres: ['Drama'],
@@ -67,7 +66,7 @@ const MOVIE_SEED = [
     description: 'A tense disaster survival thriller.',
     releaseDate: '2018-08-09',
     poster: 'https://image.tmdb.org/t/p/w500/hurricane-alley.jpg',
-    genres: ['Thriller', 'Disaster'],
+    genres: ['Thriller'],
   },
   {
     title: 'Emberfall',
@@ -78,69 +77,16 @@ const MOVIE_SEED = [
   },
 ];
 
-/* -------------------------------------------------------------------------- */
-/*                                REVIEW DATA                                 */
-/* -------------------------------------------------------------------------- */
-
 const REVIEW_SEED = [
-  {
-    title: 'Sunshine Avenue',
-    reviews: [
-      { userId: 1, rating: 4.6, comment: 'Instant smile material.' },
-      { userId: 2, rating: 4.2, comment: 'Perfect comfort film.' },
-    ],
-  },
-  {
-    title: 'Neon Pulse',
-    reviews: [
-      { userId: 1, rating: 4.8, comment: 'Adrenaline shot straight to the heart.' },
-      { userId: 3, rating: 4.4, comment: 'Stylish fights and great pacing.' },
-    ],
-  },
-  {
-    title: 'Letters to Lila',
-    reviews: [
-      { userId: 2, rating: 4.9, comment: 'Romance done right.' },
-      { userId: 3, rating: 4.5, comment: 'Soft, sincere, lovely.' },
-    ],
-  },
-  {
-    title: 'Moonlit Harbor',
-    reviews: [
-      { userId: 1, rating: 4.3, comment: 'Calm and hopeful.' },
-      { userId: 2, rating: 4.1, comment: 'Slow, but beautiful.' },
-    ],
-  },
-  {
-    title: 'Skyline Rush',
-    reviews: [
-      { userId: 1, rating: 4.2, comment: 'Wild parkour finale.' },
-      { userId: 3, rating: 4.0, comment: 'Soundtrack slaps.' },
-    ],
-  },
-  {
-    title: 'Orbiting Hearts',
-    reviews: [
-      { userId: 2, rating: 4.7, comment: 'Space romance hits hard.' },
-      { userId: 1, rating: 4.4, comment: 'Poetic and nerdy.' },
-    ],
-  },
-  {
-    title: 'Hurricane Alley',
-    reviews: [{ userId: 3, rating: 4.3, comment: 'Tense disaster thrills.' }],
-  },
-  {
-    title: 'Emberfall',
-    reviews: [
-      { userId: 1, rating: 4.0, comment: 'Moody magical noir.' },
-      { userId: 2, rating: 4.2, comment: 'Loved the worldbuilding.' },
-    ],
-  },
+  { title: 'Sunshine Avenue', reviews: [{ userId: 1, rating: 4.6 }, { userId: 2, rating: 4.2 }] },
+  { title: 'Neon Pulse', reviews: [{ userId: 1, rating: 4.8 }, { userId: 3, rating: 4.4 }] },
+  { title: 'Letters to Lila', reviews: [{ userId: 2, rating: 4.9 }, { userId: 3, rating: 4.5 }] },
+  { title: 'Moonlit Harbor', reviews: [{ userId: 1, rating: 4.3 }, { userId: 2, rating: 4.1 }] },
+  { title: 'Skyline Rush', reviews: [{ userId: 1, rating: 4.2 }, { userId: 3, rating: 4.0 }] },
+  { title: 'Orbiting Hearts', reviews: [{ userId: 2, rating: 4.7 }, { userId: 1, rating: 4.4 }] },
+  { title: 'Hurricane Alley', reviews: [{ userId: 3, rating: 4.3 }] },
+  { title: 'Emberfall', reviews: [{ userId: 1, rating: 4.0 }, { userId: 2, rating: 4.2 }] },
 ];
-
-/* -------------------------------------------------------------------------- */
-/*                               SEED FUNCTION                                */
-/* -------------------------------------------------------------------------- */
 
 async function seedMovies() {
   console.log('🌱 Starting database seed...');
@@ -151,77 +97,56 @@ async function seedMovies() {
   const transaction = await sequelize.transaction();
 
   try {
-    /* --------------------------- Validate Users --------------------------- */
+    const userCount = await User.count();
 
-    const users = await User.findAll({
-      where: { id: [1, 2, 3] },
+    if (!userCount) {
+      throw new Error('Create users before running seed.');
+    }
+
+    await Movie.bulkCreate(MOVIE_SEED, {
+      updateOnDuplicate: ['description', 'releaseDate', 'poster', 'genres'],
       transaction,
     });
 
-    if (users.length === 0) {
-      throw new Error(
-        'No users found. Create users before running seed script.'
-      );
-    }
+    console.log('🎬 Movies seeded');
 
-    /* ---------------------------- Seed Movies ----------------------------- */
-
-    const movieMap = {};
-
-    for (const payload of MOVIE_SEED) {
-      const [movie] = await Movie.upsert(payload, {
-        returning: true,
+    for (const bucket of REVIEW_SEED) {
+      const movie = await Movie.findOne({
+        where: { title: bucket.title },
         transaction,
       });
 
-      movieMap[payload.title] = movie;
-      console.log(`🎬 Seeded movie: ${payload.title}`);
-    }
+      if (!movie) continue;
 
-    /* ---------------------------- Seed Reviews ---------------------------- */
-
-    for (const bucket of REVIEW_SEED) {
-      const movie = movieMap[bucket.title];
-
-      if (!movie) {
-        console.warn(`⚠ Movie not found: ${bucket.title}`);
-        continue;
+      for (const review of bucket.reviews) {
+        await Review.upsert(
+          {
+            userId: review.userId,
+            movieId: movie.id,
+            rating: review.rating,
+          },
+          { transaction }
+        );
       }
-
-      await Promise.all(
-        bucket.reviews.map((entry) =>
-          Review.upsert(
-            {
-              userId: entry.userId,
-              movieId: movie.id,
-              rating: entry.rating,
-              comment: entry.comment,
-            },
-            { transaction }
-          )
-        )
-      );
-
-      console.log(`⭐ Reviews added for: ${bucket.title}`);
     }
+
+    console.log('⭐ Reviews seeded');
 
     await transaction.commit();
 
-    const movieCount = await Movie.count();
-    const reviewCount = await Review.count();
+    const movies = await Movie.count();
+    const reviews = await Review.count();
 
-    console.log(
-      `✅ Seed complete. Movies: ${movieCount}, Reviews: ${reviewCount}`
-    );
-  } catch (err) {
+    console.log(`✅ Seed finished | Movies: ${movies} | Reviews: ${reviews}`);
+  } catch (error) {
     await transaction.rollback();
-    console.error('❌ Seeding failed:', err);
-    process.exit(1);
-  } finally {
-    await sequelize.close();
+    throw error;
   }
 }
 
-/* -------------------------------------------------------------------------- */
-
-seedMovies();
+seedMovies()
+  .then(() => sequelize.close())
+  .catch((err) => {
+    console.error('❌ Seeding failed:', err.message);
+    sequelize.close().finally(() => process.exit(1));
+  });

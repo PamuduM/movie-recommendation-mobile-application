@@ -4,8 +4,6 @@
  * and review ratings for the AI mood recommender.
  */
 
-#!/usr/bin/env node
-
 const path = require('path');
 
 require('dotenv').config({

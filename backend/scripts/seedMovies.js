@@ -4,8 +4,6 @@
  * and review ratings for the AI mood recommender.
  */
 
-#!/usr/bin/env node
-
 const path = require('path');
 require('dotenv').config({
   path: path.resolve(__dirname, '../.env'),
@@ -16,11 +14,14 @@ require('../src/models');
 
 const { Movie, Review, User } = require('../src/models');
 
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes('--dry-run');
+const RESET = args.includes('--reset');
+
 const MOVIE_SEED = [
   {
     title: 'Sunshine Avenue',
-    description:
-      'A vibrant comedy about neighbors who start a community music night.',
+    description: 'A vibrant comedy about neighbors who start a community music night.',
     releaseDate: '2021-06-18',
     poster: 'https://image.tmdb.org/t/p/w500/sunshine-avenue.jpg',
     genres: ['Comedy', 'Family', 'Music'],
@@ -87,13 +88,21 @@ const REVIEW_SEED = [
   { title: 'Emberfall', reviews: [{ userId: 1, rating: 4.0 }, { userId: 2, rating: 4.2 }] },
 ];
 
+const log = (msg) => console.log(`[SEED] ${msg}`);
+
 const formatMovie = (movie) => ({
   ...movie,
   genres: JSON.stringify(movie.genres),
 });
 
-async function seedMovieData(transaction) {
-  console.log('🎬 Seeding movies...');
+async function resetDatabase() {
+  if (!RESET) return;
+  log('Resetting database...');
+  await sequelize.drop();
+}
+
+async function seedMoviesData(transaction) {
+  log('Seeding movies...');
   await Promise.all(
     MOVIE_SEED.map((movie) =>
       Movie.upsert(formatMovie(movie), { transaction })
@@ -101,11 +110,10 @@ async function seedMovieData(transaction) {
   );
 }
 
-async function seedReviewData(transaction) {
-  console.log('⭐ Seeding reviews...');
+async function seedReviewsData(transaction) {
+  log('Seeding reviews...');
 
   const movies = await Movie.findAll({ transaction });
-
   const movieMap = new Map(movies.map((m) => [m.title, m.id]));
 
   for (const bucket of REVIEW_SEED) {
@@ -127,24 +135,23 @@ async function seedReviewData(transaction) {
   }
 }
 
-async function seedMovies({ dryRun = false } = {}) {
-  console.log('🌱 Starting database seed...');
-
+async function runSeeder() {
   try {
+    log('Starting seeder...');
+
     await sequelize.authenticate();
+    await resetDatabase();
     await sequelize.sync({ alter: true });
 
     const userCount = await User.count();
-    if (!userCount) {
-      throw new Error('Create users before running seed.');
-    }
+    if (!userCount) throw new Error('Users must exist before seeding.');
 
     await sequelize.transaction(async (transaction) => {
-      await seedMovieData(transaction);
-      await seedReviewData(transaction);
+      await seedMoviesData(transaction);
+      await seedReviewsData(transaction);
 
-      if (dryRun) {
-        console.log('🧪 Dry run enabled — rolling back changes.');
+      if (DRY_RUN) {
+        log('Dry run — rolling back.');
         throw new Error('__DRY_RUN__');
       }
     });
@@ -154,13 +161,16 @@ async function seedMovies({ dryRun = false } = {}) {
       Review.count(),
     ]);
 
-    console.log(`✅ Seed finished | Movies: ${movies} | Reviews: ${reviews}`);
+    log(`Completed | Movies: ${movies} | Reviews: ${reviews}`);
+    process.exit(0);
   } catch (error) {
-    if (error.message === '__DRY_RUN__') return;
-    console.error('❌ Seeding failed:', error.message);
+    if (error.message !== '__DRY_RUN__') {
+      console.error('[SEED ERROR]', error.message);
+      process.exit(1);
+    }
   } finally {
     await sequelize.close();
   }
 }
 
-seedMovies();
+runSeeder();

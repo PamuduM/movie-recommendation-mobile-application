@@ -3,8 +3,8 @@
  * Seeds the SQLite development database with curated movies
  * and review ratings for the AI mood recommender.
  */
-
 const path = require('path');
+
 require('dotenv').config({
   path: path.resolve(__dirname, '../.env'),
 });
@@ -121,16 +121,22 @@ async function seedReviewsData(transaction) {
     if (!movieId) continue;
 
     await Promise.all(
-      bucket.reviews.map((review) =>
-        Review.upsert(
-          {
+      bucket.reviews.map(async (review) => {
+        const [record, created] = await Review.findOrCreate({
+          where: {
             userId: review.userId,
             movieId,
+          },
+          defaults: {
             rating: review.rating,
           },
-          { transaction }
-        )
-      )
+          transaction,
+        });
+
+        if (!created) {
+          log(`Skipped duplicate review (user ${review.userId} → movie ${bucket.title})`);
+        }
+      })
     );
   }
 }

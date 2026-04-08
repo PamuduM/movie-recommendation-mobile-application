@@ -118,7 +118,11 @@ async function seedReviewsData(transaction) {
 
   for (const bucket of REVIEW_SEED) {
     const movieId = movieMap.get(bucket.title);
-    if (!movieId) continue;
+
+    if (!movieId) {
+      log(`Missing movie for reviews: ${bucket.title}`);
+      continue;
+    }
 
     await Promise.all(
       bucket.reviews.map(async (review) => {

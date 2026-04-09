@@ -95,6 +95,9 @@ const formatMovie = (movie) => ({
   genres: JSON.stringify(movie.genres),
 });
 
+const isValidRating = (rating) =>
+  typeof rating === 'number' && rating >= 1 && rating <= 5;
+
 async function resetDatabase() {
   if (!RESET) return;
   log('Resetting database...');
@@ -103,11 +106,20 @@ async function resetDatabase() {
 
 async function seedMoviesData(transaction) {
   log('Seeding movies...');
-  await Promise.all(
-    MOVIE_SEED.map((movie) =>
-      Movie.upsert(formatMovie(movie), { transaction })
-    )
-  );
+
+  for (const movie of MOVIE_SEED) {
+    const exists = await Movie.findOne({
+      where: { title: movie.title },
+      transaction,
+    });
+
+    if (exists) {
+      log(`Skipped duplicate movie: ${movie.title}`);
+      continue;
+    }
+
+    await Movie.create(formatMovie(movie), { transaction });
+  }
 }
 
 async function seedReviewsData(transaction) {
@@ -126,6 +138,11 @@ async function seedReviewsData(transaction) {
 
     await Promise.all(
       bucket.reviews.map(async (review) => {
+        if (!isValidRating(review.rating)) {
+          log(`Invalid rating skipped (${review.rating}) for movie ${bucket.title}`);
+          return;
+        }
+
         const [record, created] = await Review.findOrCreate({
           where: {
             userId: review.userId,

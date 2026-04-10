@@ -19,62 +19,14 @@ const DRY_RUN = args.includes('--dry-run');
 const RESET = args.includes('--reset');
 
 const MOVIE_SEED = [
-  {
-    title: 'Sunshine Avenue',
-    description: 'A vibrant comedy about neighbors who start a community music night.',
-    releaseDate: '2021-06-18',
-    poster: 'https://image.tmdb.org/t/p/w500/sunshine-avenue.jpg',
-    genres: ['Comedy', 'Family', 'Music'],
-  },
-  {
-    title: 'Neon Pulse',
-    description: 'Cyberpunk action thriller packed with stylish fights.',
-    releaseDate: '2022-02-11',
-    poster: 'https://image.tmdb.org/t/p/w500/neon-pulse.jpg',
-    genres: ['Action', 'Sci-Fi'],
-  },
-  {
-    title: 'Letters to Lila',
-    description: 'A heartfelt romance told through exchanged letters.',
-    releaseDate: '2020-09-10',
-    poster: 'https://image.tmdb.org/t/p/w500/letters-lila.jpg',
-    genres: ['Romance', 'Drama'],
-  },
-  {
-    title: 'Moonlit Harbor',
-    description: 'A calm story about healing and hope by the sea.',
-    releaseDate: '2019-04-21',
-    poster: 'https://image.tmdb.org/t/p/w500/moonlit-harbor.jpg',
-    genres: ['Drama'],
-  },
-  {
-    title: 'Skyline Rush',
-    description: 'Urban parkour action across a futuristic skyline.',
-    releaseDate: '2023-01-15',
-    poster: 'https://image.tmdb.org/t/p/w500/skyline-rush.jpg',
-    genres: ['Action', 'Adventure'],
-  },
-  {
-    title: 'Orbiting Hearts',
-    description: 'A poetic long-distance romance set in space.',
-    releaseDate: '2021-12-03',
-    poster: 'https://image.tmdb.org/t/p/w500/orbiting-hearts.jpg',
-    genres: ['Romance', 'Sci-Fi'],
-  },
-  {
-    title: 'Hurricane Alley',
-    description: 'A tense disaster survival thriller.',
-    releaseDate: '2018-08-09',
-    poster: 'https://image.tmdb.org/t/p/w500/hurricane-alley.jpg',
-    genres: ['Thriller'],
-  },
-  {
-    title: 'Emberfall',
-    description: 'Dark fantasy noir in a magical dying city.',
-    releaseDate: '2022-10-28',
-    poster: 'https://image.tmdb.org/t/p/w500/emberfall.jpg',
-    genres: ['Fantasy', 'Mystery'],
-  },
+  { title: 'Sunshine Avenue', description: 'A vibrant comedy about neighbors who start a community music night.', releaseDate: '2021-06-18', poster: 'https://image.tmdb.org/t/p/w500/sunshine-avenue.jpg', genres: ['Comedy', 'Family', 'Music'] },
+  { title: 'Neon Pulse', description: 'Cyberpunk action thriller packed with stylish fights.', releaseDate: '2022-02-11', poster: 'https://image.tmdb.org/t/p/w500/neon-pulse.jpg', genres: ['Action', 'Sci-Fi'] },
+  { title: 'Letters to Lila', description: 'A heartfelt romance told through exchanged letters.', releaseDate: '2020-09-10', poster: 'https://image.tmdb.org/t/p/w500/letters-lila.jpg', genres: ['Romance', 'Drama'] },
+  { title: 'Moonlit Harbor', description: 'A calm story about healing and hope by the sea.', releaseDate: '2019-04-21', poster: 'https://image.tmdb.org/t/p/w500/moonlit-harbor.jpg', genres: ['Drama'] },
+  { title: 'Skyline Rush', description: 'Urban parkour action across a futuristic skyline.', releaseDate: '2023-01-15', poster: 'https://image.tmdb.org/t/p/w500/skyline-rush.jpg', genres: ['Action', 'Adventure'] },
+  { title: 'Orbiting Hearts', description: 'A poetic long-distance romance set in space.', releaseDate: '2021-12-03', poster: 'https://image.tmdb.org/t/p/w500/orbiting-hearts.jpg', genres: ['Romance', 'Sci-Fi'] },
+  { title: 'Hurricane Alley', description: 'A tense disaster survival thriller.', releaseDate: '2018-08-09', poster: 'https://image.tmdb.org/t/p/w500/hurricane-alley.jpg', genres: ['Thriller'] },
+  { title: 'Emberfall', description: 'Dark fantasy noir in a magical dying city.', releaseDate: '2022-10-28', poster: 'https://image.tmdb.org/t/p/w500/emberfall.jpg', genres: ['Fantasy', 'Mystery'] },
 ];
 
 const REVIEW_SEED = [
@@ -89,14 +41,10 @@ const REVIEW_SEED = [
 ];
 
 const log = (msg) => console.log(`[SEED] ${msg}`);
+const formatMovie = (movie) => ({ ...movie, genres: JSON.stringify(movie.genres) });
+const isValidRating = (rating) => typeof rating === 'number' && rating >= 1 && rating <= 5;
 
-const formatMovie = (movie) => ({
-  ...movie,
-  genres: JSON.stringify(movie.genres),
-});
-
-const isValidRating = (rating) =>
-  typeof rating === 'number' && rating >= 1 && rating <= 5;
+let summary = { moviesCreated: 0, moviesSkipped: 0, reviewsCreated: 0, reviewsSkipped: 0, reviewsInvalid: 0 };
 
 async function resetDatabase() {
   if (!RESET) return;
@@ -106,66 +54,52 @@ async function resetDatabase() {
 
 async function seedMoviesData(transaction) {
   log('Seeding movies...');
-
   for (const movie of MOVIE_SEED) {
-    const exists = await Movie.findOne({
-      where: { title: movie.title },
-      transaction,
-    });
-
+    const exists = await Movie.findOne({ where: { title: movie.title }, transaction });
     if (exists) {
+      summary.moviesSkipped++;
       log(`Skipped duplicate movie: ${movie.title}`);
       continue;
     }
-
     await Movie.create(formatMovie(movie), { transaction });
+    summary.moviesCreated++;
   }
 }
 
 async function seedReviewsData(transaction) {
   log('Seeding reviews...');
-
   const movies = await Movie.findAll({ transaction });
   const movieMap = new Map(movies.map((m) => [m.title, m.id]));
 
   for (const bucket of REVIEW_SEED) {
     const movieId = movieMap.get(bucket.title);
-
     if (!movieId) {
       log(`Missing movie for reviews: ${bucket.title}`);
       continue;
     }
-
-    await Promise.all(
-      bucket.reviews.map(async (review) => {
-        if (!isValidRating(review.rating)) {
-          log(`Invalid rating skipped (${review.rating}) for movie ${bucket.title}`);
-          return;
-        }
-
-        const [record, created] = await Review.findOrCreate({
-          where: {
-            userId: review.userId,
-            movieId,
-          },
-          defaults: {
-            rating: review.rating,
-          },
-          transaction,
-        });
-
-        if (!created) {
-          log(`Skipped duplicate review (user ${review.userId} → movie ${bucket.title})`);
-        }
-      })
-    );
+    await Promise.all(bucket.reviews.map(async (review) => {
+      if (!isValidRating(review.rating)) {
+        summary.reviewsInvalid++;
+        log(`Invalid rating skipped (${review.rating}) for movie ${bucket.title}`);
+        return;
+      }
+      const [record, created] = await Review.findOrCreate({
+        where: { userId: review.userId, movieId },
+        defaults: { rating: review.rating },
+        transaction,
+      });
+      if (created) summary.reviewsCreated++;
+      else {
+        summary.reviewsSkipped++;
+        log(`Skipped duplicate review (user ${review.userId} → movie ${bucket.title})`);
+      }
+    }));
   }
 }
 
 async function runSeeder() {
   try {
     log('Starting seeder...');
-
     await sequelize.authenticate();
     await resetDatabase();
     await sequelize.sync({ alter: true });
@@ -176,19 +110,17 @@ async function runSeeder() {
     await sequelize.transaction(async (transaction) => {
       await seedMoviesData(transaction);
       await seedReviewsData(transaction);
-
       if (DRY_RUN) {
         log('Dry run — rolling back.');
         throw new Error('__DRY_RUN__');
       }
     });
 
-    const [movies, reviews] = await Promise.all([
-      Movie.count(),
-      Review.count(),
-    ]);
+    const [movies, reviews] = await Promise.all([Movie.count(), Review.count()]);
 
     log(`Completed | Movies: ${movies} | Reviews: ${reviews}`);
+    log(`Summary | Movies Created: ${summary.moviesCreated}, Skipped: ${summary.moviesSkipped}`);
+    log(`Reviews Created: ${summary.reviewsCreated}, Skipped: ${summary.reviewsSkipped}, Invalid: ${summary.reviewsInvalid}`);
     process.exit(0);
   } catch (error) {
     if (error.message !== '__DRY_RUN__') {

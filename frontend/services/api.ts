@@ -35,13 +35,18 @@ const getDevHost = () => {
 const DEV_HOST = getDevHost();
 const API_HOST =
   Platform.OS === 'android'
-    ? (DEV_HOST && DEV_HOST !== 'localhost' ? DEV_HOST : (Constants.isDevice ? DEV_HOST ?? 'localhost' : '10.0.2.2'))
+    ? '10.0.2.2'
     : Platform.OS === 'web'
       ? 'localhost'
       : DEV_HOST ?? 'localhost';
 
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? `http://${API_HOST}:5000/api`; // Update with production URL as needed
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? `http://${API_HOST}:5000/api`;
+
+// Debug logging to verify the API URL being used
+if (__DEV__) {
+  console.log('[API Config] BASE_URL:', API_BASE_URL, 'HOST:', API_HOST, 'PLATFORM:', Platform.OS);
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

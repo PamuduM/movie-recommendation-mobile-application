@@ -28,6 +28,8 @@ build/
 # Databases
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 
 # Coverage
 coverage/

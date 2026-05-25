@@ -7,13 +7,29 @@ const sequelize = require('./config/database');
 require('./models');
 require('dotenv').config();
 
+const { generalLimiter, authLimiter, passwordResetLimiter } = require('./middleware/rateLimiter');
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
 
-app.use(cors());
+// Secure Socket.IO CORS configuration
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5000', 'http://10.0.2.2:5000'],
+    credentials: true,
+    methods: ['GET', 'POST']
+  }
+});
+
+app.use(cors({
+  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5000', 'http://10.0.2.2:5000'],
+  credentials: true
+}));
 app.use(helmet());
 app.use(express.json());
+
+// Apply general rate limiter to all routes
+app.use(generalLimiter);
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');

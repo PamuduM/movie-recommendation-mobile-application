@@ -50,7 +50,7 @@ if (__DEV__) {
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased from 10s to 30s
 });
 
 type UnauthorizedHandler = () => void | Promise<void>;
@@ -59,6 +59,17 @@ let unauthorizedHandler: UnauthorizedHandler | null = null;
 export const setUnauthorizedHandler = (handler: UnauthorizedHandler | null) => {
   unauthorizedHandler = handler;
 };
+
+// Retry logic for network failures
+const axiosRetry = require('axios-retry');
+axiosRetry(api, {
+  retries: 2,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) &&
+      !error?.response?.data?.error; // Don't retry on client errors (400/401/403, etc.)
+  },
+});
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await getAuthToken();

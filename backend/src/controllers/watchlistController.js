@@ -44,32 +44,34 @@ exports.getMyWatchlist = async (req, res) => {
     const watchlist = await loadWatchlistByUserId(req.user.id);
     res.json(watchlist);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching watchlist:', err);
+    res.status(500).json({ error: 'Failed to fetch watchlist' });
   }
 };
 
 exports.getWatchlistByUser = async (req, res) => {
   try {
     const requestedUserId = Number(req.params.userId);
-    if (!Number.isInteger(requestedUserId)) {
-      return res.status(400).json({ error: 'Invalid userId' });
+    if (!Number.isInteger(requestedUserId) || requestedUserId <= 0) {
+      return res.status(400).json({ error: 'Invalid user ID' });
     }
     if (requestedUserId !== req.user.id) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized: You can only view your own watchlist' });
     }
 
     const watchlist = await loadWatchlistByUserId(requestedUserId);
     res.json(watchlist);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching user watchlist:', err);
+    res.status(500).json({ error: 'Failed to fetch watchlist' });
   }
 };
 
 exports.addToWatchlist = async (req, res) => {
   try {
     const numericMovieId = Number(req.body.movieId);
-    if (!Number.isInteger(numericMovieId)) {
-      return res.status(400).json({ error: 'Invalid movieId' });
+    if (!Number.isInteger(numericMovieId) || numericMovieId <= 0) {
+      return res.status(400).json({ error: 'Valid movie ID is required' });
     }
 
     const [movie] = await Movie.findOrCreate({
@@ -83,20 +85,28 @@ exports.addToWatchlist = async (req, res) => {
     });
 
     await entry.reload({ include: [Movie] });
-    res.status(created ? 201 : 200).json(entry);
+    const statusCode = created ? 201 : 200;
+    const message = created ? 'Added to watchlist' : 'Already in watchlist';
+    res.status(statusCode).json({ ...entry.toJSON(), message });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Error adding to watchlist:', err);
+    res.status(400).json({ error: 'Failed to add to watchlist' });
   }
 };
 
 exports.removeFromWatchlist = async (req, res) => {
   try {
     const entry = await Watchlist.findByPk(req.params.id);
-    if (!entry) return res.status(404).json({ error: 'Entry not found' });
-    if (entry.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+    if (!entry) {
+      return res.status(404).json({ error: 'Watchlist entry not found' });
+    }
+    if (entry.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized: You can only remove your own entries' });
+    }
     await entry.destroy();
-    res.json({ message: 'Removed from watchlist' });
+    res.json({ message: 'Successfully removed from watchlist' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error removing from watchlist:', err);
+    res.status(500).json({ error: 'Failed to remove from watchlist' });
   }
 };

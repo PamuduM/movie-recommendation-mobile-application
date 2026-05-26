@@ -34,11 +34,41 @@ const LoginScreen = () => {
 
   const onLogin = async () => {
     setError(null);
+    
+    // Validate inputs
+    if (!email.trim()) {
+      setError('Email is required');
+      return;
+    }
+    if (!password) {
+      setError('Password is required');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await loginWithEmailPassword(email.trim(), password);
     } catch (e: any) {
-      setError(e?.response?.data?.error ?? e?.message ?? 'Login failed');
+      const errorMessage = e?.response?.data?.error ?? e?.message ?? 'Login failed';
+      
+      // Provide specific error messages based on status
+      if (e?.response?.status === 404) {
+        setError('Email not found. Please check and try again.');
+      } else if (e?.response?.status === 401) {
+        setError('Invalid email or password. Please try again.');
+      } else if (e?.response?.status === 429) {
+        setError('Too many login attempts. Please try again later.');
+      } else if (e?.code === 'ECONNREFUSED' || e?.message?.includes('Network')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(errorMessage);
+      }
+      
+      console.error('[LoginScreen] Login error:', e);
     } finally {
       setSubmitting(false);
     }
